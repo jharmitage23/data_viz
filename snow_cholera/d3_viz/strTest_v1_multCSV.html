@@ -1,0 +1,658 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+
+<style type="text/css">
+
+    #inds {
+      position: absolute;
+      top: 15px;
+      left: 15px;
+    }
+    
+    #tooltip {
+          position: absolute;
+          width: 100px;
+          height: auto;
+          padding: 10px;
+          background-color: white;
+          -webkit-border-radius: 10px;
+          -moz-border-radius: 10px;
+          border-radius: 10px;
+          -webkit-box-shadow: 4px 4px 10px rgba(0, 0, 0, 0.4);
+          -moz-box-shadow: 4px 4px 10px rgba(0, 0, 0, 0.4);
+          box-shadow: 4px 4px 10px rgba(0, 0, 0, 0.4);
+          pointer-events: none;
+    }
+
+    #tooltip.hidden {
+          display: none;
+    }
+
+    #tooltip p {
+          margin: 0;
+          font-family: sans-serif;
+          font-size: 10px;
+          line-height: 20px;
+    }
+
+    .axis path,
+    .axis line {
+      fill: none;
+      stroke: #000;
+      shape-rendering: crispEdges;
+    }
+
+    .x.axis path {
+      display: none;
+    }
+
+    .line {
+      fill: none;
+      stroke: red;
+      stroke-width: 1.5px;
+    }
+
+    .overlay {
+      fill: none;
+      pointer-events: all;
+    }
+
+    .focus circle {
+      fill: none;
+      stroke: steelblue;
+    }
+
+    #start {
+      position: absolute;
+      top: 45px;
+      left: 15px;
+    }
+
+    #reset {
+      position: absolute;
+      top: 75px;
+      left: 15px;
+    }
+
+    #text_anime {
+      position: absolute;
+      top: 95px;
+      left: 15px;
+      font-size: 11px;
+    }
+</style>
+
+<meta charset="utf-8">
+<title>D3 Page Template</title>
+<!-- <svg width="960" height="500"></svg> -->
+<!-- <script src="../d3.min.js"></script> -->
+<script type='text/javascript' src='http://d3js.org/d3.v4.min.js'></script>
+<head>
+<body>
+<!-- <script type='text/javascript' src='drop_v0.js'></script> -->
+ 
+  <button id="start">Start Time Animation</button>
+  <button id="reset">Reset</button>
+  <p id='text_anime'>Animation is below, <br>hover over line to see deaths <br>on a given day.</br></p>
+
+<select id='inds'>
+    <option value='all' selected='selected'>None/All</option>
+    <option value='female'>Female</option>
+    <option value='male'>Male</option>
+    <option value='t21_t40'>21 to 40</option>
+    <option value='old'>61 and Older</option>
+    <!-- <option value='t21_t40'>21 to 40</option> -->
+    <option value='pct75'>75 pct deaths</option>
+</select>
+
+<div id='tooltip' class='hidden'>
+<p><strong>Gender</strong></p> <p><span id='value'>100</span></p>
+</div>
+
+<script type='text/javascript'>
+// W=1070, H=1000
+// https://cran.r-project.org/web/packages/cholera/vignettes/roads.html
+    // make variables
+    var margin = {top: 40, right: 20, bottom: 30, left: 50},
+        W = 1070 - margin.left - margin.right,
+        H = 1000 - margin.top - margin.bottom;
+    
+    var field = [];
+    var dem = [];
+    var pmp = [];
+    var day = [];
+    var dem2 = [];
+    // var H = 940; 
+    // var W = 1000;
+    var scL = 50;
+    var pct_req = 0.005;
+    var pct_pmp = 0.015;
+    var parseDate = d3.timeParse('%x');
+    var f = 1;
+
+    // import csv's and clean them
+    d3.queue()
+      .defer(d3.csv, '/data/streets_new.csv')
+      .defer(d3.csv, '/data/deaths_age_mf.csv')
+      .defer(d3.csv, '/data/pumps.csv')
+      .defer(d3.csv, '/data/deathdays.csv')
+      .await(analyze);
+
+    function analyze(error, streets, deaths, pumps, days) {
+      if(error) { console.log(error); }
+
+      streets.forEach(function(d) {
+        d.x1 = +d.x1 * scL;
+        d.y1 = W - (+d.y1 * scL);
+        field.push([d.x1, d.y1])
+      });
+
+      deaths.forEach(function(d1) {
+        d1.loc_x = +d1.loc_x * scL;
+        d1.loc_y = W - (+d1.loc_y * scL);
+        d1.age_interval_id = +d1.age_interval_id;
+        d1.gender = +d1.gender;
+        d1.age_interval = d1.age_interval;
+        d1.gen_pop_pct = +d1.gen_pop_pct;
+        d1.age_interval_id_recode = d1.age_interval_id_recode;
+        d1.genID = d1.genID;
+        d1.ageID = d1.ageID;
+        d1.death_date = parseDate(d1.death_date);
+        d1.deaths_on_date = +d1.deaths_on_date;
+        d1.deaths_cumulative = +d1.deaths_cumulative;
+        d1.dist_main_pump = +d1.dist_main_pump;
+        d1.within_eps155 = +d1.within_eps155;
+        d1.w0_w50 = +d1.w0_w50;
+        d1.w50_w100 = +d1.w50_w100;
+        d1.w100_w150 = +d1.w100_w150;
+        d1.w150_w200 = +d1.w150_w200;
+        d1.w200_w250 = +d1.w200_w250;
+        d1.w250_w300 = +d1.w250_w300;
+        d1.w300_w400 = +d1.w300_w400;
+        d1.day_crisis = +d1.day_crisis;
+        d1.new_age_interval = d1.new_age_interval;
+        d1.dist_feet_broad = +d1.dist_feet_broad;
+        d1.w100 = +d1.w100;
+        d1.w200 = +d1.w200;
+        d1.w300 = +d1.w300;
+        d1.w400 = +d1.w400;
+        d1.w500 = +d1.w500;
+        d1.w600 = +d1.w600;
+        d1.w700 = +d1.w700;
+        dem.push([d1.loc_x, d1.loc_y, d1.age_interval_id, d1.gender, d1.age_interval,
+          d1.gen_pop_pct, d1.age_interval_id_recode, d1.genID, d1.ageID, d1.death_date,
+          d1.deaths_on_date, d1.deaths_cumulative, d1.dist_main_pump, d1.within_eps155,
+          d1.w0_w50, d1.w50_w100, d1.w100_w150, d1.w150_w200, d1.w200_w250, d1.w250_w300,
+          d1.w300_w400, d1.day_crisis, d1.new_age_interval, d1.dist_feet_broad, d1.w100,
+          d1.w200, d1.w300, d1.w400, d1.w500, d1.w600, d1.w700])
+        dem2.push([d1.dist_feet_broad, d1.w100,
+          d1.w200, d1.w300, d1.w400, d1.w500, d1.w600, d1.w700])
+      });
+
+      pumps.forEach(function(d2) {
+        d2.pump_x = +d2.pump_x * scL;
+        d2.pump_y = W - (+d2.pump_y * scL);
+        pmp.push([d2.pump_x, d2.pump_y])
+      });
+
+      days.forEach(function(d3) {
+        d3.date = parseDate(d3.date);
+        d3.deaths_freq = +d3.deaths_freq;
+        d3.day_nbr = +d3.day_nbr;
+        day.push([d3.date, d3.deaths_freq, d3.day_nbr])
+        // day.push([d3.deaths_freq])
+      });
+
+        // clean streets data
+        var test = [];
+        var i = 0;
+        N = field.length;
+
+        do {
+            if (isNaN(field[i][0]) || isNaN(field[i+1][0])) {
+                j = field[i][0];
+                i++
+            } else {
+                p0 = [field[i][0], field[i][1], field[i+1][0], field[i+1][1]];
+
+                i++;
+                test.push(p0)
+            }
+        }
+        while(i < (N-1));
+
+        // make female and male arrays
+        var fem = [];
+        var mal = [];
+        var k = 0;
+        D = dem.length;
+
+        do {
+            if (dem[k][3] == 1) {
+              fem.push(dem[k]);
+              k++
+            } else {
+              mal.push(dem[k]);
+              k++;
+            }
+        }
+        while(k - (D-1));
+
+        // make other arrays
+        var age61plus = [];
+        var age21_age40 = []
+        var within155 = []
+        var z = 0;
+
+          do {
+            if (dem[z][6] == 4) {
+                age61plus.push(dem[z]);
+                z++
+            } else if (dem[z][6] == 2) {
+                age21_age40.push(dem[z]);
+                z++;
+            } else if (dem[z][13] == 1) {
+                within155.push(dem[z]);
+                z++;
+            } else {
+              z++;
+            }
+        }
+        while(z - (D-1));
+
+        console.log(dem2);
+        // var xScale = d3.scaleBand()
+                       // .domain(d3.range(mal.length))
+                       // .rangeRound([0, W])
+                       // .paddingInner(0.05);
+
+        // define svg container
+        var svg_container = d3.select('body').append('svg')
+            .attr('width', W)
+            .attr('height', H);
+            // .style('border-color', 'black')
+            // .style('border-style', 'solid');
+            // .style('border-width', '1px');
+
+        // generate the streets
+        // svg_container.selectAll('line')
+        //              .data(test)
+        //              .enter()
+        //              .append('line')
+        //              .attr('x1', function (d) { return d[0]; })
+        //              .attr('y1', function (d) { return d[1]; })
+        //              .attr('x2', function (d) { return d[2]; })
+        //              .attr('y2', function(d) { return d[3]; })
+        //              .attr('stroke', 'black')
+        //              .attr('stroke-width', 2);
+
+        var line_group = svg_container.append('g');
+                                      // .attr('transform', 'translate(0, 80)');
+
+        var lines = line_group.selectAll('line')
+                              .data(test)
+                              .enter()
+                              .append('line');
+
+        var line_attributes = lines
+                                .attr('x1', function (d) { return d[0]; })
+                                .attr('y1', function (d) { return d[1]; })
+                                .attr('x2', function (d) { return d[2]; })
+                                .attr('y2', function(d) { return d[3]; })
+                                .attr('stroke', 'black')
+                                .attr('stroke-width', 2);
+
+        // add pumps as circles
+        svg_container.selectAll('circle')
+                     .data(pmp)
+                     .enter()
+                     .append('circle')
+                     .attr('cx', function (d) { return d[0]; })
+                     .attr('cy', function (d) { return d[1]; })
+                     .attr('r', pct_pmp * W)
+                     .style('fill', 'yellow')
+                     .style('opacity', 0.75)
+                     .style('stroke', 'blue')
+                     .style('stroke-width', 2);
+
+        // add broad street text
+        svg_container.selectAll('text')
+                     .data(pmp[6])
+                     .enter()
+                     .append('text')
+                     .attr('x', 560)
+                     .attr('y', 430)
+                     .style('font-size', 11)
+                     .style('fill', 'blue')
+                     .text('Broad Street');
+
+        // var legend = svg_container.append('g')
+        //                           .attr('class', 'legend')
+        //                           .attr('x', W - 65)
+        //                           .attr('y', 25)
+        //                           .attr('height', 100)
+        //                           .attr('width', 100)
+
+                                  
+        // svg_container.selectAll('circle')
+        //              .data(dem)
+        //              .enter()
+        //              .append('circle')
+        //              .attr('cx', function (d) {
+        //                 if (d[13] == 1) { return d[0]; }})
+        //              .attr('cy', function (d) {
+        //                 if (d[13] == 1) { return d[1]; }})
+        //              .attr('r', 1)
+        //              .style('fill', 'red');
+
+        // add male data as a rectangle
+        // if (f == 1) {
+        // svg_container.selectAll('rect')
+        //              .data(dem)
+        //              .enter()
+        //              .append('rect')
+        //              .attr('class', 'dem')
+        //              .attr('x', function (d) { return d[0]; })
+        //              .attr('y', function (d) { return d[1]; })
+        //              .attr('width', pct_req * W)
+        //              .attr('height', pct_req * H)
+        //              .style('fill', 'lightblue')
+        //              .style('opacity', 1)
+        //              // .append('title')
+        //              // .text(function (d) { return 'age interval ' + d[4]; })
+        //              .on('mouseover', function (d) {
+        //                 var xPosition = parseFloat(d3.select(this).attr('x'));
+        //                 var yPosition = parseFloat(d3.select(this).attr('y'));
+
+        //                 d3.select('#tooltip')
+        //                   .style('left', xPosition + 'px')
+        //                   .style('top', yPosition + 'px')
+        //                   .select('#value')
+        //                   .text(d[7]);
+
+        //                 d3.select('#tooltip').classed('hidden', false); })
+        //              .on('mouseout', function() {
+        //                 d3.select('#tooltip').classed('hidden', true); });
+
+                     //    svg_container.append('text')
+                     //       .attr('id', 'tooltip')
+                     //       .attr('x', xPosition)
+                     //       .attr('y', yPosition)
+                     //       .attr('text-anchor', 'middle')
+                     //       .attr('font-family', 'sans-serif')
+                     //       .attr('font-size', '11px')
+                     //       .attr('font-weight', 'bold')
+                     //       .attr('fill', 'black')
+                     //       .text(d[7]);
+                     // })
+                     // .on('mouseout', function () {
+                     //    d3.select('#tooltip').remove();
+
+                     // })
+        // };
+
+        // add female data as an ellipse
+        // if (f == 0) {
+        // svg_container.selectAll('rect')
+        //              .data(fem)
+        //              .enter()
+        //              .append('rect')
+        //              .attr('class', 'rect_female')
+        //              .attr('x', function (d) { return d[0]; })
+        //              .attr('y', function (d) { return d[1]; })
+        //              .attr('width', pct_req * W)
+        //              .attr('height', pct_req * H)
+        //              .style('fill', 'green')
+        //              .style('opacity', 0.75)
+        //              .append('title')
+        //              .text(function (d) { return 'age interval ' + d[4]; });
+
+        // svg_container.selectAll('rect')
+        //              .data(mal)
+        //              .enter()
+        //              .append('rect')
+        //              .attr('class', 'rect_male')
+        //              .attr('x', function (d) { return d[0]; })
+        //              .attr('y', function (d) { return d[1]; })
+        //              .attr('width', pct_req * W)
+        //              .attr('height', pct_req * H)
+        //              .style('fill', 'lightblue')
+        //              .style('opacity', 0.75)
+        //              .append('title')
+        //              .text(function (d) { return 'age interval ' + d[4]; });    
+        // };
+
+        // if (f == 2) {
+        // var age61plus = [];
+        // var age21_age40 = []
+        // var z = 0;
+        // D = dem.length;
+
+        //   do {
+        //     if (dem[z][6] == 4) {
+        //         age61plus.push(dem[z]);
+        //         z++
+        //     } else if (dem[z][6] == 2) {
+        //         age21_age40.push(dem[z]);
+        //         z++;
+        //     } else {
+        //         z++;
+        //     }
+        // }
+        // while(z - (D-1))
+
+        // svg_container.selectAll('ellipse')
+        //              .data(old)
+        //              .enter()
+        //              .append('ellipse')
+        //              .attr('class', 'old')
+        //              .attr('cx', function (d) { return d[0]; })
+        //              .attr('cy', function (d) { return d[1]; })
+        //              .attr('rx', pct_req * W)
+        //              .attr('ry', pct_req * H)
+        //              .style('fill', 'red')
+        //              .style('opacity', 0.5)
+        //              .append('title')
+        //              .text(function (d) { return 'age interval ' + d[4]; });
+        // };
+
+        function updateData(newData) {
+          
+          // https://stackoverflow.com/questions/24193593/d3-how-to-change-dataset-based-on-drop-down-box-selection
+
+          // var colors = ['#ffffcc','#c2e699','#78c679','#31a354','#006837', '5d0068'];
+          // var colors = d3.scaleOrdinal(d3.schemeCategory10);
+
+          var append = svg_container.selectAll('ellipse')
+                                    .data(newData);
+
+          append.enter().append('ellipse')
+                        .append('title')
+                        .text(function (d) { return 'Age Interval: ' + d[4]; });
+
+          append.transition()
+                .duration(0)
+                // .attr('x', function (d) { return d[0]; })
+                // .attr('y', function (d) { return d[1]; })
+                // .attr('width', pct_req * W)
+                // .attr('height', pct_req * H)
+                .attr('cx', function (d) { return d[0]; })
+                .attr('cy', function (d) { return d[1]; })
+                .attr('rx', pct_req * W * 2)
+                .attr('ry', pct_req * H)
+                // .style('fill', function (d, i) { return colors[3]; })
+                .style('fill', 'red')
+                .style('opacity', 0.75)
+                .style('stroke', 'black');
+          
+          append.exit().remove()
+
+        }
+
+        var all = dem;
+        var female = fem;
+        var male = mal;
+        var old = age61plus;
+        var t21_t40 = age21_age40;
+        var pct75 = within155;
+        
+        updateData(dem);
+        
+        d3.select('#inds')
+          .on('change', function () { var newData = eval(d3.select(this).property('value'));
+            updateData(newData);
+        });
+    
+    // add a title
+    svg_container.append('text')
+                     .attr('x', (W / 1.70))       
+                     .attr('y', (margin.top / 2))
+                     .attr('text-anchor', 'middle')  
+                     .style('font-size', '20px') 
+                     .style('text-decoration', 'underline')  
+                     .text('John Snow Maps the Chloera Outbreak of 1854');
+
+//     svg_container.append('svg')
+//                  .attr('width', 100)
+//                  .attr('height', 100)
+//                  .style('border-color', 'black')
+//                  .style('border-style', 'solid')
+//                  .style('border-width', '1px')
+//                  .attr("transform", "translate(" + margin.left*5 + "," + margin.top*5 + ")");
+// ;
+
+
+function buildHist(start_width, start_height) {
+
+    // built from http://duspviz.mit.edu/d3-workshop/transitions-animation/
+
+    var margin = {top: 60, right: 20, bottom: 30, left: 200},
+        width = start_width - margin.left - margin.right,
+        height = start_height - margin.top - margin.bottom;
+
+    // Adjust parsing of data to properly show tooltip
+    var parseDate = d3.timeParse("%x"),
+        bisectDate = d3.bisector(function(d) { return d.date; }).left,
+        formatValue = d3.format(",.3"),
+        formatCurrency = function(d) { return formatValue(d); };
+
+    var x = d3.scaleTime()
+              .range([0, width]);
+
+    var y = d3.scaleLinear()
+              .range([height, 0]);
+
+    var xAxis = d3.axisBottom(x);
+
+    var yAxis = d3.axisLeft(y);
+
+    var line = d3.line()
+                 .x(function(d) { return x(d.date); })
+                 .y(function(d) { return y(d.deaths_freq); });
+
+    var svg = d3.select('body')
+                .append('svg')
+                .attr('width', width + margin.left + margin.right)
+                .attr('height', height + margin.top + margin.bottom)
+                .append('g')
+                .attr('transform', "translate(" + margin.left + "," + margin.top + ")");
+
+    d3.csv('/data/deathdays.csv', function(error, data) {
+      if (error) throw error;
+      console.log(data);
+      data.forEach(function(d) {
+        d.date = parseDate(d.date);
+        d.deaths_freq = +d.deaths_freq;
+      });
+
+      x.domain(d3.extent(data, function(d) { return d.date; }));
+      y.domain(d3.extent(data, function(d) { return d.deaths_freq; }));
+
+      svg.append('g')
+          .attr('class', 'x axis')
+          .attr('transform', "translate(0," + height + ")")
+          .call(xAxis);
+
+      svg.append("g")
+          .attr('class', 'y axis')
+          .call(yAxis)
+          .append('text')
+          .attr('transform', function(d) { return "translate(" + -50 + "," + this.parentNode.getBBox().height / 2 + ") rotate(-90)"})
+          .style("text-anchor", 'middle')
+          .style('font-size', 10)
+          .style('font-weight', 'bold')
+          .style('fill', 'black')
+          .text('Chloera Deaths');
+
+      // Start Animation on Click
+      d3.select('#start').on('click', function() {
+        var path = svg.append('path')
+                      .datum(data)
+                      .attr('class', 'line')
+                      .attr('d', line);
+
+        // Variable to Hold Total Length
+        var totalLength = path.node().getTotalLength(); 
+
+        // Set Properties of Dash Array and Dash Offset and initiate Transition
+        path
+          .attr('stroke-dasharray', totalLength + " " + totalLength)
+          .attr('stroke-dashoffset', totalLength)
+          .transition()
+          .duration(5000)
+          .ease(d3.easeLinear)
+          .attr('stroke-dashoffset', 0); 
+
+        // Create SVG for Tooltip and Circle on Mouseover
+        var focus = svg.append('g')
+                       .attr('class', 'focus')
+                       .style('display', 'none');
+
+        // Append a circle to show on Mouseover
+        focus.append('circle')
+             .attr('r', 4.5);
+
+        // Append text to show on Mouseover
+        focus.append('text')
+             .attr('x', 9)
+             .attr('dy', '.35em');
+
+        // Append overlay rectangle as container for Circle and Tooltips
+        // that allows user to hover anywhere on graphic
+        svg.append('rect')
+            .attr('class', 'overlay')
+            .attr('width', width)
+            .attr('height', height)
+            // .style('fill', 'white')
+            .on('mouseover', function() { focus.style('display', null); })
+            .on('mouseout', function() { focus.style('display', 'none'); })
+            .on('mousemove', mousemove);
+
+        // Mousemove function that sets location and changes properties of Focus SVG
+        function mousemove() {
+          var x0 = x.invert(d3.mouse(this)[0]),
+              i = bisectDate(data, x0, 1),
+              d0 = data[i - 1],
+              d1 = data[i],
+              d = x0 - d0.date > d1.date - x0 ? d1 : d0;
+
+          focus.attr('transform', "translate(" + x(d.date) + "," + y(d.deaths_freq) + ")");
+          focus.select('text').text(formatCurrency(d.deaths_freq)).style('font-size', 11);
+        }
+      });
+
+      // Reset Animation
+      d3.select('#reset').on('click', function() {
+        d3.select('.line').remove();
+      });
+
+    });
+    }
+
+    buildHist(700, 365)
+  }
+
+        </script>
+    </body>
+</html>
